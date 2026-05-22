@@ -11,16 +11,26 @@ const getTotalProductExpenses = (projectId) => {
 const createProductExpense = (projectId, data) => {
   const { product_name, quantity_text, amount, expense_date } = data
   const result = db.prepare(
+<<<<<<< HEAD
     'INSERT INTO product_expenses (project_id, product_name, quantity, amount, expense_date) VALUES (?, ?, ?, ?, ?)',
   ).run(projectId, product_name, quantity_text || 1, amount, expense_date)
+=======
+    'INSERT INTO product_expenses (project_id, product_name, quantity_text, amount, expense_date) VALUES (?, ?, ?, ?, ?)',
+  ).run(projectId, product_name, quantity_text || '1', amount, expense_date)
+>>>>>>> 722cb8029b3409c1c4c7b81541574a3158539daa
   return db.prepare('SELECT * FROM product_expenses WHERE id = ?').get(result.lastInsertRowid)
 }
 
 const updateProductExpense = (id, projectId, data) => {
   const { product_name, quantity_text, amount, expense_date } = data
   db.prepare(
+<<<<<<< HEAD
     'UPDATE product_expenses SET product_name=?, quantity=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
   ).run(product_name, quantity_text || 1, amount, expense_date, id, projectId)
+=======
+    'UPDATE product_expenses SET product_name=?, quantity_text=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
+  ).run(product_name, quantity_text || '1', amount, expense_date, id, projectId)
+>>>>>>> 722cb8029b3409c1c4c7b81541574a3158539daa
   return db.prepare('SELECT * FROM product_expenses WHERE id = ?').get(id)
 }
 

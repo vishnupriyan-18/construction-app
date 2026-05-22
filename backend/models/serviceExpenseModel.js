@@ -11,7 +11,11 @@ const getTotalServiceExpenses = (projectId) => {
 const createServiceExpense = (projectId, data) => {
   const { name, type, amount, expense_date } = data
   const result = db.prepare(
+<<<<<<< HEAD
     'INSERT INTO service_expenses (project_id, service_name, service_type, amount, expense_date) VALUES (?, ?, ?, ?, ?)',
+=======
+    'INSERT INTO service_expenses (project_id, name, type, amount, expense_date) VALUES (?, ?, ?, ?, ?)',
+>>>>>>> 722cb8029b3409c1c4c7b81541574a3158539daa
   ).run(projectId, name, type || '', amount, expense_date)
   return db.prepare('SELECT * FROM service_expenses WHERE id = ?').get(result.lastInsertRowid)
 }
@@ -19,7 +23,11 @@ const createServiceExpense = (projectId, data) => {
 const updateServiceExpense = (id, projectId, data) => {
   const { name, type, amount, expense_date } = data
   db.prepare(
+<<<<<<< HEAD
     'UPDATE service_expenses SET service_name=?, service_type=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
+=======
+    'UPDATE service_expenses SET name=?, type=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
+>>>>>>> 722cb8029b3409c1c4c7b81541574a3158539daa
   ).run(name, type || '', amount, expense_date, id, projectId)
   return db.prepare('SELECT * FROM service_expenses WHERE id = ?').get(id)
 }
