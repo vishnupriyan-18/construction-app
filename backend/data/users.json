@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "name": "Gokul Maruthachalam",
+    "email": "maruthachalamgokul6@gmail.com",
+    "password": "$2a$10$fCcjpERYa.8djFaEDxeVBeR3DnWntqn27IukR0RRV.9BdF1v6Am0K"
+  },
+  {
+    "id": 2,
+    "name": "vishnu",
+    "email": "vishnupriyan466@gmail.com",
+    "password": "$2a$10$jgn4Hdig9aGhqXUbO6OVbO.J383H4Ev5SXUs2umfS5qTz3EHP3dN2"
+  }
+]

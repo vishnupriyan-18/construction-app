@@ -1,0 +1,5 @@
+const db = require('./config/db')
+const users = db.prepare('PRAGMA table_info(users)').all()
+const projects = db.prepare('PRAGMA table_info(projects)').all()
+console.log('USERS columns:', users.map(c => c.name))
+console.log('PROJECTS columns:', projects.map(c => c.name))

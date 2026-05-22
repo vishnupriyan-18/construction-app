@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "user_id": 1,
+    "project_name": "project1",
+    "client_name": "vishnu",
+    "total_amount": "6000000",
+    "used_amount": "122",
+    "balance_amount": 5999878,
+    "instructions": "",
+    "start_date": "2222-02-12",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "user_id": 2,
+    "project_name": "project-1",
+    "client_name": "gokul",
+    "total_amount": "5000000",
+    "used_amount": 2000000,
+    "balance_amount": 3000000,
+    "instructions": "",
+    "start_date": "2026-02-12",
+    "status": "Planned",
+    "expenses": [
+      {
+        "id": 1779376927862,
+        "name": "sand",
+        "quantity": 20,
+        "price": 100000,
+        "amount": 2000000
+      }
+    ]
+  }
+]
