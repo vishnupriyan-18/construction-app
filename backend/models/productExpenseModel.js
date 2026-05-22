@@ -9,18 +9,18 @@ const getTotalProductExpenses = (projectId) => {
 }
 
 const createProductExpense = (projectId, data) => {
-  const { product_name, quantity, rate, amount, expense_date } = data
+  const { product_name, quantity_text, amount, expense_date } = data
   const result = db.prepare(
-    'INSERT INTO product_expenses (project_id, product_name, quantity, rate, amount, expense_date) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(projectId, product_name, quantity || 1, rate || 0, amount, expense_date)
+    'INSERT INTO product_expenses (project_id, product_name, quantity_text, amount, expense_date) VALUES (?, ?, ?, ?, ?)',
+  ).run(projectId, product_name, quantity_text || '1', amount, expense_date)
   return db.prepare('SELECT * FROM product_expenses WHERE id = ?').get(result.lastInsertRowid)
 }
 
 const updateProductExpense = (id, projectId, data) => {
-  const { product_name, quantity, rate, amount, expense_date } = data
+  const { product_name, quantity_text, amount, expense_date } = data
   db.prepare(
-    'UPDATE product_expenses SET product_name=?, quantity=?, rate=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
-  ).run(product_name, quantity || 1, rate || 0, amount, expense_date, id, projectId)
+    'UPDATE product_expenses SET product_name=?, quantity_text=?, amount=?, expense_date=? WHERE id=? AND project_id=?',
+  ).run(product_name, quantity_text || '1', amount, expense_date, id, projectId)
   return db.prepare('SELECT * FROM product_expenses WHERE id = ?').get(id)
 }
 

@@ -4,16 +4,16 @@ const { getProjectById } = require('../models/projectModel')
 
 const normalizeProduct = (expense) => ({
   ...expense,
-  item_name: expense.product_name,
-  quantity: expense.quantity,
+  product_name: expense.product_name,
+  quantity_text: expense.quantity_text,
   amount: expense.amount,
   expense_date: expense.expense_date,
 })
 
 const normalizeService = (expense) => ({
   ...expense,
-  item_name: expense.service_name,
-  service_type: expense.service_type,
+  name: expense.name,
+  type: expense.type,
   amount: expense.amount,
   expense_date: expense.expense_date,
 })
@@ -34,12 +34,11 @@ const addProductExpense = (req, res) => {
   try {
     const project = getProjectById(req.params.id, req.user.id)
     if (!project) return res.status(404).json({ message: 'Project not found.' })
-    const { item_name, product_name, quantity, rate, amount, expense_date } = req.body
-    const name = item_name || product_name
-    if (!name || !amount || !expense_date) {
+    const { product_name, quantity_text, amount, expense_date } = req.body
+    if (!product_name || !amount || !expense_date) {
       return res.status(400).json({ message: 'Product name, amount and date are required.' })
     }
-    const expense = createProductExpense(req.params.id, { product_name: name, quantity, rate, amount, expense_date })
+    const expense = createProductExpense(req.params.id, { product_name, quantity_text, amount, expense_date })
     res.status(201).json(normalizeProduct(expense))
   } catch (error) {
     res.status(500).json({ message: 'Could not add product expense.' })
@@ -50,11 +49,10 @@ const editProductExpense = (req, res) => {
   try {
     const project = getProjectById(req.params.id, req.user.id)
     if (!project) return res.status(404).json({ message: 'Project not found.' })
-    const { item_name, product_name, quantity, rate, amount, expense_date } = req.body
+    const { product_name, quantity_text, amount, expense_date } = req.body
     const payload = {
-      product_name: item_name || product_name,
-      quantity,
-      rate,
+      product_name,
+      quantity_text,
       amount,
       expense_date,
     }
@@ -94,12 +92,11 @@ const addServiceExpense = (req, res) => {
   try {
     const project = getProjectById(req.params.id, req.user.id)
     if (!project) return res.status(404).json({ message: 'Project not found.' })
-    const { item_name, service_name, service_type, amount, expense_date } = req.body
-    const name = item_name || service_name
+    const { name, type, amount, expense_date } = req.body
     if (!name || !amount || !expense_date) {
-      return res.status(400).json({ message: 'Service name, amount and date are required.' })
+      return res.status(400).json({ message: 'Name, amount and date are required.' })
     }
-    const expense = createServiceExpense(req.params.id, { service_name: name, service_type, amount, expense_date })
+    const expense = createServiceExpense(req.params.id, { name, type, amount, expense_date })
     res.status(201).json(normalizeService(expense))
   } catch (error) {
     res.status(500).json({ message: 'Could not add service expense.' })
@@ -110,10 +107,10 @@ const editServiceExpense = (req, res) => {
   try {
     const project = getProjectById(req.params.id, req.user.id)
     if (!project) return res.status(404).json({ message: 'Project not found.' })
-    const { item_name, service_name, service_type, amount, expense_date } = req.body
+    const { name, type, amount, expense_date } = req.body
     const payload = {
-      service_name: item_name || service_name,
-      service_type,
+      name,
+      type,
       amount,
       expense_date,
     }
