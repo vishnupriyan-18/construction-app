@@ -1,32 +1,32 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Phone, Lock, Eye, EyeOff } from 'lucide-react'
-import toast from 'react-hot-toast'
-import api from '../api/api'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '../api/api';
 
 export default function Login() {
-  const navigate = useNavigate()
-  const [form, setForm] = useState({ phone_number: '', password: '' })
-  const [showPass, setShowPass] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ phone_number: '', password: '' });
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
     try {
-      const { data } = await api.post('/login', form)
-      localStorage.setItem('erp_token', data.token)
-      localStorage.setItem('erp_user', JSON.stringify(data.user))
-      navigate('/dashboard')
+      const { data } = await api.post('/login', form);
+      localStorage.setItem('erp_token', data.token);
+      localStorage.setItem('erp_user', JSON.stringify(data.user));
+      navigate('/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed')
+      toast.error(err.response?.data?.message || 'Login failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center px-4 py-10">
@@ -89,12 +89,15 @@ export default function Login() {
         </form>
 
         <p className="text-center text-gray-600 text-sm mt-8">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-white hover:text-gray-300 transition-colors font-medium">
+          Don’t have an account?{' '}
+          <Link
+            to="/register"
+            className="text-blue-600 hover:text-blue-800 font-medium underline transition-colors"
+          >
             Register
           </Link>
         </p>
       </motion.div>
     </div>
-  )
+  );
 }

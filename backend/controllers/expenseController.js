@@ -3,19 +3,23 @@ const { getServiceExpenses, createServiceExpense, updateServiceExpense, deleteSe
 const { getProjectById } = require('../models/projectModel')
 
 const normalizeProduct = (expense) => ({
-  ...expense,
-  item_name: expense.product_name,
-  quantity: expense.quantity,
+  id: expense.id,
+  project_id: expense.project_id,
+  product_name: expense.product_name,
+  quantity_text: expense.quantity,
   amount: expense.amount,
   expense_date: expense.expense_date,
+  created_at: expense.created_at,
 })
 
 const normalizeService = (expense) => ({
-  ...expense,
-  item_name: expense.service_name,
-  service_type: expense.service_type,
+  id: expense.id,
+  project_id: expense.project_id,
+  name: expense.service_name,
+  type: expense.service_type,
   amount: expense.amount,
   expense_date: expense.expense_date,
+  created_at: expense.created_at,
 })
 
 // Product Expenses

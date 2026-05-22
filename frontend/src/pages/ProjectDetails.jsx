@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Plus, Trash2, Package, Wrench, Phone, Calendar, Wallet, Check, Printer, Download, LayoutGrid } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Plus, Trash2, Calendar, Check, Printer, Download } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -19,7 +19,12 @@ const fmtDate = (d) => {
 
 function ExpenseRow({ expense, fields, onChange, onSave, onDelete }) {
   return (
-    <tr className="border-b border-slate-200 last:border-b-0">
+    <motion.tr
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50 transition-colors"
+    >
       {fields.map((field) => (
         <td key={field.key} className="px-4 py-3 text-sm text-slate-700">
           {field.type === 'input' ? (
@@ -27,42 +32,53 @@ function ExpenseRow({ expense, fields, onChange, onSave, onDelete }) {
               type={field.inputType}
               value={expense[field.key] || ''}
               onChange={(e) => onChange(expense.id, field.key, e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none"
+              className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-slate-900 outline-none transition hover:bg-slate-100 focus:border-slate-300 focus:bg-white"
+              placeholder={`Enter ${field.label.toLowerCase()}`}
             />
           ) : (
-            <span>{expense[field.key] || '—'}</span>
+            <span className="px-2 font-medium">{field.format ? field.format(expense[field.key]) : (expense[field.key] || '—')}</span>
           )}
         </td>
       ))}
-      <td className="px-4 py-3 flex items-center gap-2">
+      <td className="px-4 py-3 flex items-center justify-end gap-2">
         <button
           onClick={() => onSave(expense)}
-          className="rounded-2xl bg-slate-950 px-3 py-2 text-white transition hover:bg-slate-800"
+          title="Save Row"
+          className="rounded-xl bg-slate-950 px-3 py-1.5 text-white transition hover:bg-slate-800 flex items-center gap-1"
         >
-          <Check size={16} />
+          <Check size={14} /> Save
         </button>
         <button
           onClick={() => onDelete(expense)}
-          className="rounded-2xl bg-slate-100 px-3 py-2 text-slate-700 transition hover:bg-slate-200"
+          title="Delete Row"
+          className="rounded-xl bg-slate-100 px-3 py-1.5 text-slate-600 transition hover:bg-slate-200 flex items-center gap-1"
         >
-          <Trash2 size={16} />
+          <Trash2 size={14} />
         </button>
       </td>
-    </tr>
+    </motion.tr>
   )
 }
 
 export default function ProjectDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const printRef = useRef(null)
+  
+  // Data States
   const [project, setProject] = useState(null)
   const [payments, setPayments] = useState([])
   const [productExpenses, setProductExpenses] = useState([])
   const [serviceExpenses, setServiceExpenses] = useState([])
+  
+  // UI States
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
-  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_date: '' })
+  const [activeTab, setActiveTab] = useState('overview') // overview, payments, products, services
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_date: new Date().toISOString().slice(0, 10) })
+
+  // Refs for printing
+  const printPaymentRef = useRef(null)
+  const printProductRef = useRef(null)
+  const printServiceRef = useRef(null)
 
   const fetchProject = async () => {
     const { data } = await api.get(`/projects/${id}`)
@@ -91,11 +107,8 @@ export default function ProjectDetails() {
       await Promise.all([fetchPayments(), fetchProductExpenses(), fetchServiceExpenses()])
     } catch (error) {
       console.error('Project details load failed', error)
-      const message = error.response?.data?.message || 'Failed to load project details.'
-      toast.error(message)
-      if (error.response?.status === 404) {
-        navigate('/dashboard')
-      }
+      toast.error('Failed to load project details.')
+      if (error.response?.status === 404) navigate('/dashboard')
     } finally {
       setLoading(false)
     }
@@ -105,24 +118,20 @@ export default function ProjectDetails() {
     fetchAll()
   }, [id])
 
+  // Payments Logic
   const handleAddPayment = async (e) => {
     e.preventDefault()
-    if (!paymentForm.amount || !paymentForm.payment_date) {
-      toast.error('Enter payment amount and date')
-      return
-    }
-
+    if (!paymentForm.amount || !paymentForm.payment_date) return toast.error('Enter payment amount and date')
     try {
       await api.post(`/projects/${id}/payments`, {
         amount_received: Number(paymentForm.amount),
         payment_date: paymentForm.payment_date,
       })
       toast.success('Payment added')
-      setPaymentForm({ amount: '', payment_date: '' })
+      setPaymentForm({ amount: '', payment_date: new Date().toISOString().slice(0, 10) })
       await fetchPayments()
       await fetchProject()
-    } catch (error) {
-      console.error('Save payment failed', error)
+    } catch {
       toast.error('Unable to save payment')
     }
   }
@@ -138,29 +147,42 @@ export default function ProjectDetails() {
     }
   }
 
-  const handleExpenseChange = (id, field, value, type) => {
+  // Expense Table Logic
+  const handleExpenseChange = (rowId, field, value, type) => {
     const updater = type === 'product' ? setProductExpenses : setServiceExpenses
-    updater((prev) => prev.map((expense) => (expense.id === id ? { ...expense, [field]: value } : expense)))
+    updater((prev) => prev.map((exp) => (exp.id === rowId ? { ...exp, [field]: value } : exp)))
   }
 
   const handleSaveExpense = async (expense, type) => {
     const endpoint = type === 'product' ? 'products' : 'services'
-    const payload = {
-      item_name: expense.item_name,
-      amount: Number(expense.amount || 0),
-      expense_date: expense.expense_date,
-    }
-
+    
+    let payload = {}
     if (type === 'product') {
-      payload.quantity = Number(expense.quantity || 0)
+      if (!expense.product_name || !expense.amount || !expense.expense_date) {
+        return toast.error('Name, amount and date are required')
+      }
+      payload = {
+        product_name: expense.product_name,
+        quantity_text: expense.quantity_text || '1',
+        amount: Number(expense.amount || 0),
+        expense_date: expense.expense_date,
+      }
     } else {
-      payload.service_type = expense.service_type
+      if (!expense.name || !expense.amount || !expense.expense_date) {
+        return toast.error('Name, amount and date are required')
+      }
+      payload = {
+        name: expense.name,
+        type: expense.type || '',
+        amount: Number(expense.amount || 0),
+        expense_date: expense.expense_date,
+      }
     }
 
     try {
       if (expense.isNew) {
         const { data } = await api.post(`/projects/${id}/expenses/${endpoint}`, payload)
-        toast.success('Expense added')
+        toast.success('Row saved')
         if (type === 'product') {
           setProductExpenses((prev) => prev.filter((item) => item.id !== expense.id).concat(data))
         } else {
@@ -168,60 +190,84 @@ export default function ProjectDetails() {
         }
       } else {
         await api.put(`/projects/${id}/expenses/${endpoint}/${expense.id}`, payload)
-        toast.success('Expense updated')
+        toast.success('Row updated')
+        if (type === 'product') {
+          await fetchProductExpenses()
+        } else {
+          await fetchServiceExpenses()
+        }
       }
       await fetchProject()
-      if (type === 'product') {
-        await fetchProductExpenses()
-      } else {
-        await fetchServiceExpenses()
-      }
-    } catch {
-      toast.error('Unable to save expense')
+    } catch (err) {
+      console.error('Save expense error:', err)
+      toast.error(err.response?.data?.message || 'Unable to save row')
     }
   }
 
   const handleDeleteExpense = async (expense, type) => {
+    const updater = type === 'product' ? setProductExpenses : setServiceExpenses
     if (expense.isNew) {
-      if (type === 'product') {
-        setProductExpenses((prev) => prev.filter((item) => item.id !== expense.id))
-      } else {
-        setServiceExpenses((prev) => prev.filter((item) => item.id !== expense.id))
-      }
+      updater((prev) => prev.filter((item) => item.id !== expense.id))
       return
     }
-
     const endpoint = type === 'product' ? 'products' : 'services'
     try {
       await api.delete(`/projects/${id}/expenses/${endpoint}/${expense.id}`)
-      toast.success('Expense removed')
-      if (type === 'product') {
-        await fetchProductExpenses()
-      } else {
-        await fetchServiceExpenses()
-      }
+      toast.success('Row deleted')
+      updater((prev) => prev.filter((item) => item.id !== expense.id))
       await fetchProject()
     } catch {
-      toast.error('Unable to delete expense')
+      toast.error('Unable to delete row')
     }
   }
 
   const handleAddRow = (type) => {
     const row = {
       id: `new-${Date.now()}`,
-      item_name: '',
       amount: '',
       expense_date: new Date().toISOString().slice(0, 10),
-      quantity: type === 'product' ? 1 : undefined,
-      service_type: type === 'service' ? '' : undefined,
       isNew: true,
     }
     if (type === 'product') {
+      row.product_name = ''
+      row.quantity_text = ''
       setProductExpenses((prev) => [row, ...prev])
     } else {
+      row.name = ''
+      row.type = ''
       setServiceExpenses((prev) => [row, ...prev])
     }
   }
+
+  // PDF Export Logic
+  const handleExportPDF = (title, columns, data) => {
+    const doc = new jsPDF()
+    doc.setFontSize(20)
+    doc.text(title, 14, 22)
+    doc.setFontSize(11)
+    doc.setTextColor(100)
+    doc.text(`Project: ${project?.project_name}`, 14, 30)
+    doc.text(`Client: ${project?.client_name}`, 14, 36)
+    doc.text(`Generated: ${fmtDate(new Date())}`, 14, 42)
+    
+    const tableData = data.map(item => columns.map(col => item[col.key] || ''))
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [columns.map(col => col.label)],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }, // Slate 950
+      styles: { fontSize: 10, cellPadding: 5 },
+    })
+    
+    doc.save(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`)
+  }
+
+  // Print Handlers
+  const printPayments = useReactToPrint({ content: () => printPaymentRef.current })
+  const printProducts = useReactToPrint({ content: () => printProductRef.current })
+  const printServices = useReactToPrint({ content: () => printServiceRef.current })
 
   if (loading) {
     return (
@@ -234,260 +280,283 @@ export default function ProjectDetails() {
     )
   }
 
-  if (!project) {
-    return (
-      <div className="flex min-h-screen bg-bg text-slate-950">
-        <Sidebar />
-        <main className="flex-1 ml-60 flex items-center justify-center py-24 px-6">
-          <div className="max-w-xl rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-sm">
-            <p className="text-lg font-semibold text-slate-900">Unable to load project details.</p>
-            <p className="mt-3 text-sm text-slate-500">Please check your network connection or return to the dashboard.</p>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="mt-6 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Back to dashboard
-            </button>
-          </div>
-        </main>
-      </div>
-    )
-  }
+  if (!project) return null
 
   const totalExpenses = (project.total_expenses || 0)
   const remainingBalance = (project.total_received || 0) - totalExpenses
 
-  const paymentFields = [
-    { label: 'Amount (₹)', key: 'amount', inputType: 'number' },
-    { label: 'Payment Date', key: 'payment_date', inputType: 'date' },
-  ]
-
   const productFields = [
-    { label: 'Item', key: 'item_name', type: 'input', inputType: 'text' },
-    { label: 'Qty', key: 'quantity', type: 'input', inputType: 'number' },
-    { label: 'Amount', key: 'amount', type: 'input', inputType: 'number' },
+    { label: 'Product Name', key: 'product_name', type: 'input', inputType: 'text' },
+    { label: 'Quantity', key: 'quantity_text', type: 'input', inputType: 'text' },
+    { label: 'Amount (₹)', key: 'amount', type: 'input', inputType: 'number' },
     { label: 'Date', key: 'expense_date', type: 'input', inputType: 'date' },
   ]
 
   const serviceFields = [
-    { label: 'Service', key: 'item_name', type: 'input', inputType: 'text' },
-    { label: 'Type', key: 'service_type', type: 'input', inputType: 'text' },
-    { label: 'Amount', key: 'amount', type: 'input', inputType: 'number' },
+    { label: 'Name', key: 'name', type: 'input', inputType: 'text' },
+    { label: 'Type', key: 'type', type: 'input', inputType: 'text' },
+    { label: 'Amount (₹)', key: 'amount', type: 'input', inputType: 'number' },
     { label: 'Date', key: 'expense_date', type: 'input', inputType: 'date' },
   ]
 
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'payments', label: 'Client Payments' },
+    { id: 'products', label: 'Product Expenses' },
+    { id: 'services', label: 'Service Expenses' },
+  ]
+
   return (
-    <div className="flex min-h-screen bg-bg text-slate-950">
+    <div className="flex min-h-screen bg-bg text-slate-950 font-sans">
       <Sidebar />
-      <main className="flex-1 ml-60 px-6 py-8 lg:px-10 lg:py-10">
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="space-y-6">
+      <main className="flex-1 ml-60 flex flex-col h-screen overflow-hidden">
+        {/* Workspace Header */}
+        <header className="border-b border-slate-200 bg-white px-8 py-6 shrink-0">
+          <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-900"
             >
-              <ArrowLeft size={16} /> Back to dashboard
+              <ArrowLeft size={16} /> Back to Dashboard
             </button>
-            <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Project overview</p>
-                  <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{project.project_name}</h1>
-                  <p className="mt-3 text-sm text-slate-600">{project.client_name} · {project.client_phone || 'No phone provided'}</p>
-                  <p className="mt-2 text-sm text-slate-500 flex items-center gap-2">
-                    <Calendar size={16} /> {fmtDate(project.start_date)}
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Total Received</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-950">{fmt(project.total_received)}</p>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Expenses</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-950">{fmt(totalExpenses)}</p>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Remaining</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-950">{fmt(remainingBalance)}</p>
-                  </div>
-                </div>
+            <div className="flex items-center gap-4 text-sm text-slate-500">
+              <span className="flex items-center gap-1.5"><Calendar size={14} /> Started {fmtDate(project.start_date)}</span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950">{project.project_name}</h1>
+              <p className="mt-1 text-base text-slate-600">Client: {project.client_name} {project.client_phone ? `· ${project.client_phone}` : ''}</p>
+            </div>
+            
+            <div className="flex gap-6 xl:gap-10 pb-1">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1">Total Received</p>
+                <p className="text-2xl font-bold text-slate-800">{fmt(project.total_received)}</p>
+              </div>
+              <div className="w-px bg-slate-200" />
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1">Expenses</p>
+                <p className="text-2xl font-bold text-rose-600">{fmt(totalExpenses)}</p>
+              </div>
+              <div className="w-px bg-slate-200" />
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1">Balance</p>
+                <p className="text-2xl font-bold text-emerald-600">{fmt(remainingBalance)}</p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-            <section className="space-y-6">
-              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6">
-                  <p className="text-sm font-semibold text-slate-900">Client Payments</p>
-                  <p className="mt-1 text-sm text-slate-500">A clean running log of payments received.</p>
-                </div>
-                <form onSubmit={handleAddPayment} className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">Amount</label>
-                    <input
-                      type="number"
-                      value={paymentForm.amount}
-                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-400"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">Date</label>
-                    <input
-                      type="date"
-                      value={paymentForm.payment_date}
-                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, payment_date: e.target.value }))}
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-400"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      Save Payment
-                    </button>
-                  </div>
-                </form>
-
-                <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-[0.18em]">
-                      <tr>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Amount</th>
-                        <th className="px-4 py-3">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.length === 0 ? (
-                        <tr>
-                          <td colSpan="3" className="px-4 py-8 text-center text-sm text-slate-500">
-                            No payments recorded yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        payments.map((payment) => (
-                          <tr key={payment.id} className="border-t border-slate-200">
-                            <td className="px-4 py-4 text-sm text-slate-700">{fmtDate(payment.payment_date)}</td>
-                            <td className="px-4 py-4 text-sm font-semibold text-slate-950">{fmt(payment.amount_received ?? payment.amount)}</td>
-                            <td className="px-4 py-4">
-                              <button
-                                onClick={() => handleDeletePayment(payment)}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-200"
-                              >
-                                <Trash2 size={14} />
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-4 mb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Product Expenses</p>
-                    <p className="mt-1 text-sm text-slate-500">Track material purchases in one spreadsheet-style table.</p>
-                  </div>
-                  <button
-                    onClick={() => handleAddRow('product')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                  >
-                    <Plus size={16} /> New Row
-                  </button>
-                </div>
-                <div className="overflow-x-auto rounded-3xl border border-slate-200">
-                  <table className="min-w-full text-left">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-[0.18em]">
-                      <tr>
-                        <th className="px-4 py-3">Item</th>
-                        <th className="px-4 py-3">Qty</th>
-                        <th className="px-4 py-3">Amount</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productExpenses.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-slate-500">
-                            No product expenses yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        productExpenses.map((expense) => (
-                          <ExpenseRow
-                            key={expense.id}
-                            expense={expense}
-                            fields={productFields}
-                            onChange={(rowId, key, value) => handleExpenseChange(rowId, key, value, 'product')}
-                            onSave={(row) => handleSaveExpense(row, 'product')}
-                            onDelete={(row) => handleDeleteExpense(row, 'product')}
-                          />
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-4 mb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Service Expenses</p>
-                    <p className="mt-1 text-sm text-slate-500">Manage onsite labor, subcontractor, and service costs.</p>
-                  </div>
-                  <button
-                    onClick={() => handleAddRow('service')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                  >
-                    <Plus size={16} /> New Row
-                  </button>
-                </div>
-                <div className="overflow-x-auto rounded-3xl border border-slate-200">
-                  <table className="min-w-full text-left">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-[0.18em]">
-                      <tr>
-                        <th className="px-4 py-3">Service</th>
-                        <th className="px-4 py-3">Type</th>
-                        <th className="px-4 py-3">Amount</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {serviceExpenses.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-slate-500">
-                            No service expenses yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        serviceExpenses.map((expense) => (
-                          <ExpenseRow
-                            key={expense.id}
-                            expense={expense}
-                            fields={serviceFields}
-                            onChange={(rowId, key, value) => handleExpenseChange(rowId, key, value, 'service')}
-                            onSave={(row) => handleSaveExpense(row, 'service')}
-                            onDelete={(row) => handleDeleteExpense(row, 'service')}
-                          />
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
+          {/* Tabs */}
+          <div className="mt-8 flex items-center gap-8 border-b border-slate-200">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`pb-4 text-sm font-semibold transition-colors relative ${
+                  activeTab === tab.id ? 'text-slate-950' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <motion.div layoutId="activeTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-950" />
+                )}
+              </button>
+            ))}
           </div>
+        </header>
+
+        {/* Tab Content - Scrollable Area */}
+        <div className="flex-1 overflow-auto bg-slate-50/50 p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              {/* OVERVIEW TAB */}
+              {activeTab === 'overview' && (
+                <div className="max-w-3xl space-y-8">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+                    <h2 className="text-lg font-bold text-slate-900 mb-6">Workspace Overview</h2>
+                    <p className="text-slate-600 leading-relaxed">
+                      This is your dedicated workspace for <strong>{project.project_name}</strong>. 
+                      Navigate through the tabs above to manage Client Payments, Product Expenses, and Service Expenses.
+                      <br/><br/>
+                      The tables are designed for fast, spreadsheet-style data entry. You can edit inline, add new rows quickly, and export your data to PDF for reporting.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* PAYMENTS TAB */}
+              {activeTab === 'payments' && (
+                <div className="h-full flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-white">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">Client Payments Log</h2>
+                      <p className="text-sm text-slate-500 mt-1">Record payments received from the client.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => handleExportPDF('Client Payments', [{label:'Date', key:'payment_date'}, {label:'Amount', key:'amount_received'}], payments)} className="btn-outline flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Download size={16} /> PDF
+                      </button>
+                      <button onClick={printPayments} className="btn-outline flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Printer size={16} /> Print
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-6 bg-slate-50/50 border-b border-slate-200">
+                    <form onSubmit={handleAddPayment} className="flex flex-wrap items-end gap-4 max-w-3xl">
+                      <div className="flex-1">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Amount Received (₹)</label>
+                        <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(p => ({...p, amount: e.target.value}))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-slate-500" placeholder="0" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Date</label>
+                        <input type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm(p => ({...p, payment_date: e.target.value}))} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-slate-500" />
+                      </div>
+                      <button type="submit" className="rounded-xl bg-slate-950 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 shrink-0">
+                        Record Payment
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="flex-1 overflow-auto p-0" ref={printPaymentRef}>
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-white sticky top-0 border-b border-slate-200 z-10 shadow-sm">
+                        <tr>
+                          <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Date</th>
+                          <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Amount</th>
+                          <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <AnimatePresence>
+                          {payments.map(payment => (
+                            <motion.tr key={payment.id} initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="hover:bg-slate-50 transition-colors group">
+                              <td className="px-6 py-4 text-sm font-medium text-slate-700">{fmtDate(payment.payment_date)}</td>
+                              <td className="px-6 py-4 text-sm font-bold text-emerald-600">{fmt(payment.amount_received || payment.amount)}</td>
+                              <td className="px-6 py-4 text-right">
+                                <button onClick={() => handleDeletePayment(payment)} className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Trash2 size={14} /> Remove
+                                </button>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* PRODUCTS TAB */}
+              {activeTab === 'products' && (
+                <div className="h-full flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-white z-10">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">Product Expenses Tracker</h2>
+                      <p className="text-sm text-slate-500 mt-1">Spreadsheet for materials and products.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => handleExportPDF('Product Expenses', productFields, productExpenses)} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Download size={16} /> PDF
+                      </button>
+                      <button onClick={printProducts} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Printer size={16} /> Print
+                      </button>
+                      <button onClick={() => handleAddRow('product')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 text-white hover:bg-slate-800 text-sm font-semibold shadow-md">
+                        <Plus size={16} /> Add Row
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 overflow-auto bg-white" ref={printProductRef}>
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 z-10">
+                        <tr>
+                          {productFields.map(f => (
+                            <th key={f.key} className="px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{f.label}</th>
+                          ))}
+                          <th className="px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 text-right w-32">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <AnimatePresence>
+                          {productExpenses.map((expense) => (
+                            <ExpenseRow
+                              key={expense.id}
+                              expense={expense}
+                              fields={productFields}
+                              onChange={(rowId, key, value) => handleExpenseChange(rowId, key, value, 'product')}
+                              onSave={(row) => handleSaveExpense(row, 'product')}
+                              onDelete={(row) => handleDeleteExpense(row, 'product')}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SERVICES TAB */}
+              {activeTab === 'services' && (
+                <div className="h-full flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-white z-10">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">Service Expenses Tracker</h2>
+                      <p className="text-sm text-slate-500 mt-1">Spreadsheet for labor, contractors, and services.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => handleExportPDF('Service Expenses', serviceFields, serviceExpenses)} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Download size={16} /> PDF
+                      </button>
+                      <button onClick={printServices} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-semibold">
+                        <Printer size={16} /> Print
+                      </button>
+                      <button onClick={() => handleAddRow('service')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 text-white hover:bg-slate-800 text-sm font-semibold shadow-md">
+                        <Plus size={16} /> Add Row
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 overflow-auto bg-white" ref={printServiceRef}>
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 z-10">
+                        <tr>
+                          {serviceFields.map(f => (
+                            <th key={f.key} className="px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{f.label}</th>
+                          ))}
+                          <th className="px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 text-right w-32">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <AnimatePresence>
+                          {serviceExpenses.map((expense) => (
+                            <ExpenseRow
+                              key={expense.id}
+                              expense={expense}
+                              fields={serviceFields}
+                              onChange={(rowId, key, value) => handleExpenseChange(rowId, key, value, 'service')}
+                              onSave={(row) => handleSaveExpense(row, 'service')}
+                              onDelete={(row) => handleDeleteExpense(row, 'service')}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

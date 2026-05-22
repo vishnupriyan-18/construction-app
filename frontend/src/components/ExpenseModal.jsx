@@ -29,11 +29,30 @@ export default function ExpenseModal({ open, onClose, projectId, onSuccess }) {
     e.preventDefault()
     setLoading(true)
     try {
-      const payload = { ...form, category }
-      const { data } = await api.post(`/projects/${projectId}/expenses`, payload)
+      const endpoint = category === 'Product' ? 'products' : 'services'
+      let payload = {}
+      
+      if (category === 'Product') {
+        payload = {
+          product_name: form.item_name,
+          quantity_text: form.quantity || '1',
+          amount: Number(form.amount),
+          expense_date: form.expense_date,
+        }
+      } else {
+        payload = {
+          name: form.item_name,
+          type: form.service_type || '',
+          amount: Number(form.amount),
+          expense_date: form.expense_date,
+        }
+      }
+      
+      const { data } = await api.post(`/projects/${projectId}/expenses/${endpoint}`, payload)
       toast.success('Expense added!')
       onSuccess(data)
       onClose()
+      setForm(category === 'Product' ? productForm : serviceForm)
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add expense')
     } finally {
