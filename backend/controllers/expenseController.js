@@ -12,8 +12,8 @@ const normalizeProduct = (expense) => ({
 
 const normalizeService = (expense) => ({
   ...expense,
-  name: expense.name,
-  type: expense.type,
+  name: expense.service_name,
+  type: expense.service_type,
   amount: expense.amount,
   expense_date: expense.expense_date,
 })

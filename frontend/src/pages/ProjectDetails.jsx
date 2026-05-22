@@ -155,7 +155,7 @@ export default function ProjectDetails() {
 
   const handleSaveExpense = async (expense, type) => {
     const endpoint = type === 'product' ? 'products' : 'services'
-    
+
     let payload = {}
     if (type === 'product') {
       if (!expense.product_name || !expense.amount || !expense.expense_date) {
@@ -183,7 +183,6 @@ export default function ProjectDetails() {
       if (expense.isNew) {
         const { data } = await api.post(`/projects/${id}/expenses/${endpoint}`, payload)
         toast.success('Row saved')
-<<<<<<< HEAD
         if (type === 'product') {
           setProductExpenses((prev) => prev.filter((item) => item.id !== expense.id).concat(data))
         } else {
@@ -202,17 +201,6 @@ export default function ProjectDetails() {
     } catch (err) {
       console.error('Save expense error:', err)
       toast.error(err.response?.data?.message || 'Unable to save row')
-=======
-        if (type === 'product') setProductExpenses((prev) => prev.filter((item) => item.id !== expense.id).concat(data))
-        else setServiceExpenses((prev) => prev.filter((item) => item.id !== expense.id).concat(data))
-      } else {
-        await api.put(`/projects/${id}/expenses/${endpoint}/${expense.id}`, payload)
-        toast.success('Row updated')
-      }
-      await fetchProject()
-    } catch {
-      toast.error('Unable to save row')
->>>>>>> 722cb8029b3409c1c4c7b81541574a3158539daa
     }
   }
 

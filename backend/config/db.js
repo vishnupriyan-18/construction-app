@@ -55,8 +55,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS service_expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    type TEXT DEFAULT '',
+    service_name TEXT NOT NULL,
+    service_type TEXT DEFAULT '',
     amount REAL NOT NULL DEFAULT 0,
     expense_date TEXT,
     created_at TEXT DEFAULT (datetime('now')),
